@@ -16,7 +16,9 @@ function App() {
   const [scaleHighlights, setScaleHighlights] = useState([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLooping, setIsLooping] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
   const [synth, setSynth] = useState(null);
+  const [melodySynth, setMelodySynth] = useState(null);
 
  
 
@@ -67,10 +69,83 @@ function App() {
   }, [markedSteps, chromatic]);
 
   useEffect(() => {
-    // Using PolySynth to play multiple notes simultaneously
+    // Using two synths: one for sustained chord, one for melody
     const newSynth = new Tone.PolySynth(Tone.Synth).toDestination();
+    const melodySynth = new Tone.Synth().toDestination();
+    
+    // Set the chord synth to be quieter
+    newSynth.volume.value = -12; // Reduce volume by 12 decibels
+    melodySynth.volume.value = -6; // Slightly reduce melody volume too
+
     setSynth(newSynth);
+    setMelodySynth(melodySynth);
+
+    // Set up initial transport settings
+    Tone.Transport.bpm.value = 120;
+    Tone.Transport.timeSignature = 4;
+
+    return () => {
+      // Cleanup when component unmounts
+      Tone.Transport.stop();
+      Tone.Transport.cancel();
+    };
   }, []);
+
+  useEffect(() => {
+    if (!synth || !melodySynth || !isPlaying) return;
+
+    // Clear any existing events
+    Tone.Transport.cancel();
+
+    if (markedSteps.length === 0) return;
+
+    // Create a loop for the sustained chord
+    const chordLoop = new Tone.Loop((time) => {
+      // Get all selected frets for the current chord
+      const notesToPlay = clickedFrets.map(fretId => {
+        const [stringIndex, fretIndex] = fretId.split('-').map(Number);
+        const note = notes[stringIndex][fretIndex];
+        return getNoteWithOctave(stringIndex, fretIndex, note);
+      });
+
+      // Play the chord for one full measure
+      if (notesToPlay.length > 0) {
+        synth.triggerAttackRelease(notesToPlay, "1m", time);
+      }
+    }, "1m");
+
+    // Create a sequence for the scale steps
+    const stepLoop = new Tone.Loop((time) => {
+      // Get the scale notes based on marked steps
+      const scaleNotes = markedSteps.map(step => chromatic[step % 12]);
+      
+      scaleNotes.forEach((note, i) => {
+        const stepTime = time + (i * Tone.Time("1m").toSeconds() / markedSteps.length);
+        // Play each scale note with increasing octave
+        const octave = 4; // Starting octave
+        melodySynth.triggerAttackRelease(`${note}${octave}`, "8n", stepTime);
+      });
+    }, "1m");
+
+    chordLoop.start(0);
+    stepLoop.start(0);
+
+    return () => {
+      chordLoop.dispose();
+      stepLoop.dispose();
+    };
+  }, [clickedFrets, synth, melodySynth, isPlaying, markedSteps, chromatic]);
+
+  const togglePlayback = async () => {
+    await Tone.start();
+    if (!isPlaying && clickedFrets.length > 0) {
+      setIsPlaying(true);
+      Tone.Transport.start();
+    } else {
+      setIsPlaying(false);
+      Tone.Transport.stop();
+    }
+  };
 
   const getNoteWithOctave = (stringIndex, fretIndex, note) => {
     const baseNote = stringTunings[stringIndex];
@@ -142,6 +217,12 @@ function App() {
           disabled={clickedFrets.length === 0}
         >
           Play Selected Notes
+        </button>
+        <button 
+          className={`playback-button ${isPlaying ? 'playing' : ''}`} 
+          onClick={togglePlayback}
+        >
+          {isPlaying ? 'Stop' : 'Play'}
         </button>
       </div>
       <Tablet 

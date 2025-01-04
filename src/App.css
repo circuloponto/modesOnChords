@@ -141,31 +141,28 @@ width: 1050px;
   margin: 20px 0;
 }
 
-.playback-button,
-.loop-button {
-  padding: 10px 20px;
-  font-size: 16px;
-  border: none;
-  border-radius: 5px;
-  color: white;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
 .playback-button {
-  background-color: #4CAF50;
+  padding: 10px 20px;
+  margin: 10px;
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s;
 }
 
 .playback-button:hover {
-  background-color: #45a049;
+  background-color: #1976D2;
 }
 
 .playback-button.playing {
-  background-color: #f44336;
+  background-color: #F44336;
 }
 
 .playback-button.playing:hover {
-  background-color: #da190b;
+  background-color: #D32F2F;
 }
 
 .loop-button {
