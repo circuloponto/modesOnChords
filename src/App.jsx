@@ -70,8 +70,29 @@ function App() {
 
   useEffect(() => {
     // Using two synths: one for sustained chord, one for melody
-    const newSynth = new Tone.PolySynth(Tone.Synth).toDestination();
-    const melodySynth = new Tone.Synth().toDestination();
+    const newSynth = new Tone.PolySynth(Tone.Synth, {
+      oscillator: {
+        type: "triangle"
+      },
+      envelope: {
+        attack: 0.02,
+        decay: 0.3,
+        sustain: 0.3,
+        release: 1
+      }
+    }).toDestination();
+
+    const melodySynth = new Tone.Synth({
+      oscillator: {
+        type: "square8"  // More harmonically rich for lead guitar sound
+      },
+      envelope: {
+        attack: 0.005,
+        decay: 0.1,
+        sustain: 0.3,
+        release: 0.1
+      }
+    }).toDestination();
     
     // Set the chord synth to be quieter
     newSynth.volume.value = -12; // Reduce volume by 12 decibels
@@ -115,26 +136,38 @@ function App() {
     }, "1m");
 
     // Create a sequence for the scale steps
-    const stepLoop = new Tone.Loop((time) => {
-      // Get the scale notes based on marked steps
-      const scaleNotes = markedSteps.map(step => chromatic[step % 12]);
+    const stepLoop = new Tone.Loop(time => {
+      console.log('Current root note:', chromatic[0]);
+      console.log('Marked steps:', markedSteps);
       
-      scaleNotes.forEach((note, i) => {
-        const stepTime = time + (i * Tone.Time("1m").toSeconds() / markedSteps.length);
-        // Play each scale note with increasing octave
-        const octave = 4; // Starting octave
-        melodySynth.triggerAttackRelease(`${note}${octave}`, "8n", stepTime);
-      });
+      const scaleNotes = markedSteps.map(step => chromatic[step]);
+      console.log('Scale notes array:', scaleNotes);
+      
+      // Create and start sequence immediately
+      new Tone.Sequence((time, note) => {
+        console.log('Playing note:', note);
+        melodySynth.triggerAttackRelease(`${note}4`, "8n", time);
+      }, scaleNotes, "8n").start(0);
+      
     }, "1m");
 
     chordLoop.start(0);
     stepLoop.start(0);
 
+    // Dispose both loops when effect changes
     return () => {
       chordLoop.dispose();
       stepLoop.dispose();
     };
   }, [clickedFrets, synth, melodySynth, isPlaying, markedSteps, chromatic]);
+
+  useEffect(() => {
+    if (isPlaying) {
+      // Stop and restart Transport to reset sequence
+      Tone.Transport.stop();
+      Tone.Transport.start();
+    }
+  }, [chromatic, isPlaying]);
 
   const togglePlayback = async () => {
     await Tone.start();
@@ -189,17 +222,17 @@ function App() {
     }
   };
 
-  const rotateChromatic = (newRoot) => {
-    const rootIndex = chromatic.indexOf(newRoot);
-    if (rootIndex === -1) return;
-  
-    const rotatedChromatic = [
-      ...chromatic.slice(rootIndex),
-      ...chromatic.slice(0, rootIndex)
+  const onSelectOption = (option) => {
+    const rootIndex = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'].indexOf(option);
+    // Rotate chromatic array to put root note at index 0
+    const newChromatic = [
+      ...['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'].slice(rootIndex),
+      ...['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'].slice(0, rootIndex)
     ];
-  
-    setChromatic(rotatedChromatic);
-    setSelectedOption(newRoot);
+    setChromatic(newChromatic);
+    
+    // Reset Transport position
+    Tone.Transport.position = 0;
   };
 
   return (
@@ -233,7 +266,7 @@ function App() {
         selectedOption={selectedOption} 
         setSelectedOption={setSelectedOption}
         options={chromatic} 
-        onSelectOption={rotateChromatic}
+        onSelectOption={onSelectOption}
       /> 
       <Fretboard 
         notes={notes} 
