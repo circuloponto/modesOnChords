@@ -19,6 +19,7 @@ function App() {
   const [currentStep, setCurrentStep] = useState(0);
   const [synth, setSynth] = useState(null);
   const [melodySynth, setMelodySynth] = useState(null);
+  const sequenceRef = useRef(null);
 
  
 
@@ -136,28 +137,27 @@ function App() {
     }, "1m");
 
     // Create a sequence for the scale steps
+    const scaleNotes = markedSteps.map(step => chromatic[step]);
+    console.log('Scale notes array:', scaleNotes);
+    
     const stepLoop = new Tone.Loop(time => {
-      console.log('Current root note:', chromatic[0]);
-      console.log('Marked steps:', markedSteps);
-      
-      const scaleNotes = markedSteps.map(step => chromatic[step]);
-      console.log('Scale notes array:', scaleNotes);
-      
-      // Create and start sequence immediately
-      new Tone.Sequence((time, note) => {
-        console.log('Playing note:', note);
-        melodySynth.triggerAttackRelease(`${note}4`, "8n", time);
-      }, scaleNotes, "8n").start(0);
-      
+      // Play each note in sequence
+      scaleNotes.forEach((note, i) => {
+        const noteTime = time + (i * Tone.Time("8n").toSeconds());
+        melodySynth.triggerAttackRelease(`${note}4`, "8n", noteTime);
+      });
     }, "1m");
 
     chordLoop.start(0);
     stepLoop.start(0);
 
-    // Dispose both loops when effect changes
+    // Dispose everything when effect changes
     return () => {
       chordLoop.dispose();
       stepLoop.dispose();
+      if (sequenceRef.current) {
+        sequenceRef.current.dispose();
+      }
     };
   }, [clickedFrets, synth, melodySynth, isPlaying, markedSteps, chromatic]);
 
